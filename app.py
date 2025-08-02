@@ -21,22 +21,23 @@ logger = logging.getLogger(__name__)
 # Carregar variáveis de ambiente
 load_dotenv()
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
-BINANCE_API_SECRET = os.getenv('BINANCE_API_SECRET')
+# BINANCE_API_KEY = os.getenv('BINANCE_API_KEY')
+# BINANCE_API_SECRET = os.getenv('BINANCE_API_SECRET')
 
 # Função para coletar dados em tempo real
 # A função já estava pronta para receber um símbolo, agora vamos usá-lo dinamicamente
 async def fetch_crypto_data(symbol='BTC/USDT', timeframe='1h', limit=500):
     try:
-        exchange = ccxt.binance({
-            'apiKey': BINANCE_API_KEY,
-            'secret': BINANCE_API_SECRET,
-            'enableRateLimit': True,
+        exchange = ccxt.kraken({
+            # 'apiKey': BINANCE_API_KEY,
+            # 'secret': BINANCE_API_SECRET,
+            # 'enableRateLimit': True,
+            'enableRateLimit' : True,
         })
         await exchange.load_markets()
         # Verifica se o símbolo existe na corretora
         if symbol not in exchange.markets:
-            logger.error(f"Símbolo {symbol} não encontrado na Binance.")
+            logger.error(f"Símbolo {symbol} não encontrado na Kraken.") # Troquei o nome de binance para kraken
             await exchange.close()
             return None
             

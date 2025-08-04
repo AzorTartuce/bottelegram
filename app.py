@@ -73,7 +73,22 @@ def create_features(df):
     df['ma7'] = df['close'].rolling(window=7).mean()
     df['ma21'] = df['close'].rolling(window=21).mean()
     df['rsi'] = compute_rsi(df['close'], 14)
-    df['atr'] = calculate_atr(df)
+    df['atr'] = calculate_atr(df) # ATR Padrão (14)
+    df['atr_short'] = calculate_atr(df, period=7) # ATR Curto (7)
+    df['atr_long'] = calculate_atr(df, period=21) # ATR Long (21)
+    # MACD
+    df['macd'], df['macd_signal'] = compute_macd(df['close'])
+    # Bandas de Bollinger
+    df['bb_upper'], df['bb_lower'] = compute_bollinger_bands(df['close'])
+    # VWAP
+    df['vwap'] = compute_vwap(df)
+    # MOMENTUM  
+    df['momentum'] = compute_momentum(df['close'], period=10)
+    # MEDIAS MOVEIS
+    df['ma50'] = df['close'].rolling(window=50).mean()
+    df['ma200'] = df['close'].rolling(window=200).mean()
+    # RETORNOS LOGARITIMOS
+    df['log_returns'] = np.log(df['close'] / df['close'].shift(1))
     df = df.dropna()
     return df
 
@@ -87,6 +102,34 @@ def compute_rsi(series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
+# Função para calcular MACD
+def compute_macd(series, fast=12, slow=26, signal=9):
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd = exp1 - exp2
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    return macd, signal_line
+
+# Função para calcular Bandas de Bollinger
+def compute_bollinger_bands(series, window=20, num_std=2):
+    rolling_mean = series.rolling(window).mean()
+    rolling_std = series.rolling(window).std()
+    upper_band = rolling_mean + (rolling_std * num_std)
+    lower_band = rolling_mean - (rolling_std * num_std)
+    return upper_band, lower_band
+
+# Função para calcular VWAP (Volume Weighted Average Price)
+def compute_vwap(df):
+    vwap = (df['close'] * df['volume']).cumsum() / df['volume'].cumsum()
+    return vwap
+
+# Função para calcular Momentum
+def compute_momentum(series,period=10):
+    # Momentum = Preço atual - Preço de 'periodos' atrás
+    momentum = series - series.shift(period)
+    return momentum
+
+
 # Função para calcular níveis de stop-loss e take-profit
 def calculate_risk_levels(last_close, atr, risk_factor=1.5, reward_factor=2.0):
     stop_loss = last_close - (atr * risk_factor)
@@ -95,7 +138,7 @@ def calculate_risk_levels(last_close, atr, risk_factor=1.5, reward_factor=2.0):
 
 # Função para treinar o modelo e prever
 async def train_and_predict(df):
-    features = ['open', 'high', 'low', 'volume', 'returns', 'volatility', 'ma7', 'ma21', 'rsi', 'atr']
+    features = ['open', 'high', 'low', 'volume', 'returns', 'log_returns', 'volatility', 'ma7', 'ma21', 'ma50', 'ma200' ,'rsi', 'atr', 'atr_short', 'atr_long', 'vwap', 'momentum', ]
     X = df[features]
     y = df['close'].shift(-1)
     X = X[:-1]
@@ -166,7 +209,24 @@ async def analisar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     df = create_features(df)
-    
+
+    # Sinal de entrada/saída usando MACD e Bolliger Bands
+    inal = ""
+    if df['macd'].iloc[-1] > df['macd_signal'].iloc[-1] and df['close'].iloc[-1] > df['bb_upper'].iloc[-1]:
+        sinal = "Sinal de COMPRA forte 🚀"
+    elif df['macd'].iloc[-1] < df['macd_signal'].iloc[-1] and df['close'].iloc[-1] < df['bb_lower'].iloc[-1]:
+        sinal = "Sinal de VENDA forte ⚠️"
+    else:
+        sinal = "Sem sinal claro no momento."
+    # Inclua 'sinal' na mensagem enviada ao usuário
+
+    if df['close'].iloc[-1] > df['vwap'].iloc[-1]:
+        sinal_vwap = "Preço acima do VWAP: tendência de alta 📈"
+    elif df['close'].iloc[-1] < df['vwap'].iloc[-1]:
+        sinal_vwap = "Preço abaixo do VWAP: tendência de baixa 📉"
+    else:
+        sinal_vwap = "Preço próximo ao VWAP: sem tendência clara."
+
     # Verifica se o dataframe tem dados suficientes após criar as features
     if df.empty:
         await send_telegram_message(context, update.effective_chat.id,

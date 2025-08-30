@@ -34,7 +34,7 @@ logger.info("Cliente Supabase inicializado.")
 
 # --- Funções de Coleta e Features (sem alterações) ---
 
-async def fetch_crypto_data(symbol='BTC/USDT', timeframe='1h', limit=500):
+async def fetch_crypto_data(symbol='BTC/USDT', timeframe='1h', limit=1000):
     try:
         exchange = ccxt.kraken({'enableRateLimit': True})
         await exchange.load_markets()
